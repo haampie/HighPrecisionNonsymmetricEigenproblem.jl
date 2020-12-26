@@ -1,0 +1,13 @@
+name = "HighPrecisionNonsymmetricEigenproblem"
+uuid = "c479f659-fb30-408d-a32c-1d3025061a22"
+authors = ["Harmen Stoppels <me@harmenstoppels.nl>"]
+version = "0.1.0"
+
+[compat]
+julia = "1.3"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
