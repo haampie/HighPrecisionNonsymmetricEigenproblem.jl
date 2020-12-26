@@ -1,5 +1,10 @@
 module HighPrecisionNonsymmetricEigenproblem
 
-# Write your package code here.
+using StructArrays, VectorizationBase, LinearAlgebra
+
+include("soa_multifloat.jl")
+include("schur.jl")
+include("utils.jl")
+include("multiprecision.jl")
 
 end
