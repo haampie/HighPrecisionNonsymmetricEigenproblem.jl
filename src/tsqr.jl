@@ -33,35 +33,35 @@ function cols_to_band!(A, offset_row, offset_col, block_size, τs)
     # The part to which we apply the tall and skinny QR from the right.
     A_right = view(A, :, offset_row:size(A, 1))
 
-    @sync for block_start = 1:block_size:size(A_qr, 1)
+    #=@sync=# for block_start = 1:block_size:size(A_qr, 1)
         let
             block_end = min(block_start + block_size - 1, size(A_qr, 1))
             range = block_start:block_end
             A_qr′ = view(A_qr, range, :)
             τs′ = view(τs, range)
-            @spawn block_qr!(A_qr′, τs′)
+            #=@spawn=# block_qr!(A_qr′, τs′)
         end
     end
 
-    @sync for block_start = 1:block_size:size(A_qr, 1)
+    #=@sync=# for block_start = 1:block_size:size(A_qr, 1)
         let
             block_end = min(block_start + block_size - 1, size(A_qr, 1))
             range = block_start:block_end
             A_qr′ = view(A_qr, range, :)
             A_left′ = view(A_left, range, :)
             τs′ = view(τs, range)
-            @spawn apply_left!(A_qr′, A_left′, τs′)
+            #=@spawn=# apply_left!(A_qr′, A_left′, τs′)
         end
     end
 
-    @sync for block_start = 1:block_size:size(A_qr, 1)
+    #=@sync=# for block_start = 1:block_size:size(A_qr, 1)
         let
             block_end = min(block_start + block_size - 1, size(A_qr, 1))
             range = block_start:block_end
             A_qr′ = view(A_qr, range, :)
             A_right′ = view(A_right, :, range)
             τs′ = view(τs, range)
-            @spawn apply_right!(A_qr′, A_right′, τs′)
+            #=@spawn=# apply_right!(A_qr′, A_right′, τs′)
         end
     end
 
@@ -72,7 +72,7 @@ function cols_to_band!(A, offset_row, offset_col, block_size, τs)
         nblocks = ÷(size(A_qr, 1), merged_block_size, RoundUp)
         nblocks ≤ 1 && break
 
-        @sync for block_start = 1:2merged_block_size:size(A_qr, 1)
+        #=@sync=# for block_start = 1:2merged_block_size:size(A_qr, 1)
             let
                 # If only a single block or less fits, stop.
                 block_start + merged_block_size - 1 ≥ size(A_qr, 1) && break
@@ -81,11 +81,11 @@ function cols_to_band!(A, offset_row, offset_col, block_size, τs)
                 range = block_start:block_end
                 A_qr′ = view(A_qr, range, :)
                 τs′ = view(τs, range)
-                @spawn merge_block_qr!(A_qr′, τs′, merged_block_size)
+                #=@spawn=# merge_block_qr!(A_qr′, τs′, merged_block_size)
             end
         end
 
-        @sync for block_start = 1:2merged_block_size:size(A_qr, 1)
+        #=@sync=# for block_start = 1:2merged_block_size:size(A_qr, 1)
             let
                 # If only a single block or less fits, stop.
                 block_start + merged_block_size - 1 ≥ size(A_qr, 1) && break
@@ -95,11 +95,11 @@ function cols_to_band!(A, offset_row, offset_col, block_size, τs)
                 A_qr′ = view(A_qr, range, :)
                 A_left′ = view(A_left, range, :)
                 τs′ = view(τs, range)
-                @spawn apply_left_with_gap!(A_qr′, A_left′, τs′, merged_block_size)
+                #=@spawn=# apply_left_with_gap!(A_qr′, A_left′, τs′, merged_block_size)
             end
         end
 
-        @sync for block_start = 1:2merged_block_size:size(A_qr, 1)
+        #=@sync=# for block_start = 1:2merged_block_size:size(A_qr, 1)
             let
                 # If only a single block or less fits, stop.
                 block_start + merged_block_size - 1 ≥ size(A_qr, 1) && break
@@ -109,7 +109,7 @@ function cols_to_band!(A, offset_row, offset_col, block_size, τs)
                 A_qr′ = view(A_qr, range, :)
                 A_right′ = view(A_right, :, range)
                 τs′ = view(τs, range)
-                @spawn apply_right_with_gap!(A_qr′, A_right′, τs′, merged_block_size)
+                #=@spawn=# apply_right_with_gap!(A_qr′, A_right′, τs′, merged_block_size)
             end
         end
 
