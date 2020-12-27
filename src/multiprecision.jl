@@ -1,8 +1,11 @@
 using VectorizationBase: Vec, MM, mask, pick_vector_width_shift
 
 using Base.Cartesian: @nexprs, @ntuple
+using Base: IEEEFloat
 
-@generated function rmul!(A::StructArray{MultiFloat{T,N}, 2}, G::Rotation2{MultiFloat{T,N},MultiFloat{T,N}}) where {T,N}
+import LinearAlgebra: lmul!, rmul!
+
+@generated function rmul!(A::StructArray{MultiFloat{T,N}, 2}, G::Rotation2{MultiFloat{T,N},MultiFloat{T,N}}) where {T<:IEEEFloat,N}
 
     W, Wshift = pick_vector_width_shift(T)
 
@@ -51,7 +54,7 @@ using Base.Cartesian: @nexprs, @ntuple
     end
 end
 
-@generated function lmul!(G::Rotation2{MultiFloat{T,N},MultiFloat{T,N}}, A::StructArray{MultiFloat{T,N}, 2}) where {T,N}
+@generated function lmul!(G::Rotation2{MultiFloat{T,N},MultiFloat{T,N}}, A::StructArray{MultiFloat{T,N}, 2}) where {T<:IEEEFloat,N}
 
     W, Wshift = pick_vector_width_shift(T)
 
