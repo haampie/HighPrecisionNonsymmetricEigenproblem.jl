@@ -161,8 +161,6 @@ end
 function merge_block_qr!(A, τs, v_block_size)
     m, n = size(A)
 
-    B = copy(A)
-
     # Create a bunch of reflectors and save the norm value (τ)
     @inbounds for k = OneTo(n)
         gap = v_block_size - k + 1
