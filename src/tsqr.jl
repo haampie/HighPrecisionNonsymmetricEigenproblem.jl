@@ -48,7 +48,7 @@ function to_band!(A::AbstractMatrix{T}, p = Panel(16, 32)) where {T}
     τs = Vector{T}(undef, reflectors_per_tsqr(m - p.w, p))
 
     # loop over all column blocks
-    for b = OneTo((m - p.w) ÷ p.w)
+    for b = OneTo(÷(m - p.w, p.w, RoundUp))
 
         # divide into the bit we're QR'ing
         # the bit to which we apply it from the left
