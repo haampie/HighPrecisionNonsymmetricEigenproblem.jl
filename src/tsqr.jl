@@ -241,8 +241,6 @@ end
 function block_qr!(A, τs)
     m, n = size(A)
 
-    B = copy(A)
-
     steps = min(m - 1, n)
 
     # Create a bunch of reflectors and save the norm value (τ)
