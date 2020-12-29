@@ -122,7 +122,9 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[StructArrays]]
 deps = ["Adapt", "DataAPI", "Tables"]
-git-tree-sha1 = "8099ed9fb90b6e754d6ba8c6ed8670f010eadca0"
+git-tree-sha1 = "8809a80eb6790c2a173a384974ccbb7dfe1650dc"
+repo-rev = "use-vararg"
+repo-url = "https://github.com/haampie/StructArrays.jl.git"
 uuid = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 version = "0.4.4"
 
