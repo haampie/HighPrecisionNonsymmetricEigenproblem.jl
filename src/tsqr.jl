@@ -111,19 +111,20 @@ function tsqr!(A, τs, p::Panel)
 
     # we've already done the leaf nodes, so - 1.
     for level = OneTo(tree_height)
-        num_panels_vertically = ÷(m, merged_block_size, RoundUp)
+        let num_panels_vertically = ÷(m, merged_block_size, RoundUp), merged_block_size=merged_block_size
 
-        # combine all pairs of panels.
-        @sync for b = OneTo(num_panels_vertically ÷ 2)
-            b_start = (b - 1) * 2merged_block_size + 1
-            b_end = min(b_start + 2merged_block_size - 1, m)
+            # combine all pairs of panels.
+            @sync for b = OneTo(num_panels_vertically ÷ 2)
+                b_start = (b - 1) * 2merged_block_size + 1
+                b_end = min(b_start + 2merged_block_size - 1, m)
 
-            A′ = view(A, b_start:b_end, :)
-            τs′ = view(τs, τ_offset:τ_offset+p.w-1)
-            
-            @spawn merge_block_qr!(A′, τs′, merged_block_size)
-            
-            τ_offset += p.w
+                A′ = view(A, b_start:b_end, :)
+                τs′ = view(τs, τ_offset:τ_offset+p.w-1)
+
+                @spawn merge_block_qr!(A′, τs′, merged_block_size)
+
+                τ_offset += p.w
+            end
         end
 
         merged_block_size *= 2
