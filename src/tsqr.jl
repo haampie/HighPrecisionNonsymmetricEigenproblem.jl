@@ -351,41 +351,24 @@ end
     m, n = size(A)
     m == 0 && return A
 
-    @inbounds for j = 1:n
-        # dot
-        vAj = A[1, j]
-        for i = 1+gap:m
-            vAj += x[i]'*A[i, j]
-        end
-
-        vAj = conj(τ)*vAj
-
-        # ger
+    for j = 1:n
+        Aj, xj = view(A, 1+gap:m, j), view(x, 1+gap:m)
+        vAj = conj(τ)*(A[1, j] + dot(xj, Aj))
         A[1, j] -= vAj
-        for i = 1+gap:m
-            A[i, j] -= x[i]*vAj
-        end
+        axpy!(-vAj, xj, Aj)
     end
+
     return A
 end
 
 @inline function reflectorApplyRight!(A::AbstractMatrix, τ::Number, x::AbstractVector, gap = 1)
     m, n = size(A)
     n == 0 && return A
-    @inbounds for j = 1:m
-        # dot
-        vAj = A[j, 1]
-        for i = 1+gap:n
-            vAj += x[i]*A[j, i]
-        end
-
-        vAj = τ*vAj
-
-        # ger
+    for j = 1:m
+        Aj, xj = view(A, j, 1+gap:n), view(x, 1+gap:n)
+        vAj = τ * (A[j, 1] + dot(Aj, xj))
         A[j, 1] -= vAj
-        for i = 1+gap:n
-            A[j, i] -= x[i]'*vAj
-        end
+        axpy!(-vAj, xj, Aj)
     end
     return A
 end
