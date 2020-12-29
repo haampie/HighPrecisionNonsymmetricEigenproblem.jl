@@ -1,6 +1,6 @@
 module HighPrecisionNonsymmetricEigenproblem
 
-using StructArrays, VectorizationBase, LinearAlgebra
+using StructArrays, VectorizationBase, LinearAlgebra, TimerOutputs
 
 
 """
@@ -31,6 +31,7 @@ struct Rotation3{Tc,Ts} <: SmallRotation
     i::Int
 end
 
+const TIMER = TimerOutput()
 
 include("tsqr.jl")
 include("hessenberg.jl")

@@ -3,6 +3,8 @@ using Base: OneTo
 using Base.Threads: @spawn
 using Base: @sync
 
+export Panel, to_band!
+
 struct Panel
     w::Int
     h::Int
@@ -55,15 +57,12 @@ function to_band!(A::AbstractMatrix{T}, p = Panel(16, 32)) where {T}
         next_block = curr_block + p.w
 
         A_qr = view(A, next_block:m, curr_block:next_block-1)
-
-        tsqr!(A_qr, τs, p)
-
-        # Now apply the tsqr bit from the left and the right to A.
         A_left = view(A, next_block:m, next_block:m)
         A_right = view(A, :, next_block:m)
 
-        apply_tsqr_left!(A_qr, A_left, τs, p)
-        apply_tsqr_right!(A_qr, A_right, τs, p)
+        @timeit TIMER "tsqr!" tsqr!(A_qr, τs, p)
+        @timeit TIMER "apply_tsqr_left!" apply_tsqr_left!(A_qr, A_left, τs, p)
+        @timeit TIMER "apply_tsqr_right!" apply_tsqr_right!(A_qr, A_right, τs, p)
     end
 
     return A
