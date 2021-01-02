@@ -39,25 +39,17 @@ end
     end
 end
 
-@generated function truncate_args(::Val{K}, x::Vararg{Any, N}) where {N,K}
+@generated function Base.getindex(A::MFArray{T,M,N}, I::Vararg{Int,N}) where {T,M,N}
     quote
-        @ntuple $(min(N, K)) j -> x[j]
+        $(Expr(:meta, :inline, :propagate_inbounds))
+        MultiFloat{T,M}(@ntuple $M j -> A.A[I..., j])
     end
 end
 
-@generated function Base.getindex(A::MFArray{T,M,N}, I::Vararg{Int,K}) where {T,M,N,K}
+@generated function Base.setindex!(A::MFArray{T,M,N}, v::MultiFloat{T,M}, I::Vararg{Int,N}) where {T,M,N}
     quote
         $(Expr(:meta, :inline, :propagate_inbounds))
-        ids = truncate_args(Val{N}(), I...)
-        MultiFloat{T,M}(@ntuple $M j -> A.A[ids..., j])
-    end
-end
-
-@generated function Base.setindex!(A::MFArray{T,M,N}, v::MultiFloat{T,M}, I::Vararg{Int,K}) where {T,M,N,K}
-    quote
-        $(Expr(:meta, :inline, :propagate_inbounds))
-        ids = truncate_args(Val{N}(), I...)
-        @nexprs $M j -> A.A[ids..., j] = v._limbs[j]
+        @nexprs $M j -> A.A[I..., j] = v._limbs[j]
         return v
     end
 end
@@ -67,9 +59,8 @@ function MFArray(A::AbstractArray{MultiFloat{T,M},N}) where {T,M,N}
     return MFArray{T,M,N,typeof(A′)}(A′)
 end
 
-function view(A::MFArray{T,M,N}, I::Vararg{Any,K}) where {K,T,M,N}
-    ids = truncate_args(Val{N}(), I...)
-    B = view(A.A, ids..., :)
+@inline function view(A::MFArray{T,M,N}, I::Vararg{Any,N}) where {T,M,N}
+    B = view(A.A, I..., :)
     return MFArray{T,M,ndims(B)-1,typeof(B)}(B)
 end
 
