@@ -171,7 +171,7 @@ const MFVector{T,M} = MFArray{T,M,1}
 
 using Base.Cartesian: @ntuple
 
-import LinearAlgebra: axpy!
+import LinearAlgebra: axpy!, dot
 
 @generated function LinearAlgebra.axpy!(a::MultiFloat{T,M}, xs::MFVector{T,M}, ys::MFVector{T,M}) where {T,M}
 
@@ -213,5 +213,44 @@ import LinearAlgebra: axpy!
         vstore!(py, VecUnroll(yi′._limbs), I, remainder_mask)
 
         return ys
+    end
+end
+
+@generated function LinearAlgebra.dot(xs::MFVector{T,M}, ys::MFVector{T,M}) where {T,M}
+    W, Wshift = pick_vector_width_shift(T)
+
+    quote
+        m = size(xs.A, 1)
+        i = 1
+
+        px = stridedpointer(xs.A)
+        py = stridedpointer(ys.A)
+
+        vec_total = zero(MultiFloat{Vec{$W,$T},$M})
+
+        for step = Base.OneTo(m >> $Wshift)
+            I = Unroll{2,1,$M,1,$W,zero(UInt)}((i, 1))
+            
+            xi = MultiFloat(vload(px, I).data)
+            yi = MultiFloat(vload(py, I).data)
+
+            vec_total += xi * yi
+
+            i += $W
+        end
+
+        remainder = m & ($W - 1)
+        remainder == 0 && @goto sum_scalar
+        remainder_mask = mask($T, remainder)
+
+        I = Unroll{2,1,$M,1,$W,typemax(UInt)}((i, 1))
+            
+        xi = MultiFloat(vload(px, I, remainder_mask).data)
+        yi = MultiFloat(vload(py, I, remainder_mask).data)
+
+        vec_total += xi * yi
+
+        @label sum_scalar
+        return +(TupleOfMultiFloat(vec_total)...)
     end
 end
