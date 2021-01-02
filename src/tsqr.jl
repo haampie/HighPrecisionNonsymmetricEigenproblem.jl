@@ -91,13 +91,13 @@ function tsqr!(A, τs, p::Panel)
     τ_offset = 1
 
     # First standard QR on every panel.
-    @sync for b = OneTo(num_panels_vertically)
+    #=@sync=# for b = OneTo(num_panels_vertically)
         b_start = (b - 1) * p.h + 1
         b_end = min(b_start + p.h - 1, m)
         τs′ = view(τs, τ_offset:τ_offset+p.w-1)
         A′ = view(A, b_start:b_end, :)
 
-        @spawn block_qr!(A′, τs′)
+        #=@spawn=# block_qr!(A′, τs′)
 
         τ_offset += p.w
     end
@@ -113,14 +113,14 @@ function tsqr!(A, τs, p::Panel)
         let num_panels_vertically = ÷(m, merged_block_size, RoundUp), merged_block_size=merged_block_size
 
             # combine all pairs of panels.
-            @sync for b = OneTo(num_panels_vertically ÷ 2)
+            #=@sync=# for b = OneTo(num_panels_vertically ÷ 2)
                 b_start = (b - 1) * 2merged_block_size + 1
                 b_end = min(b_start + 2merged_block_size - 1, m)
 
                 A′ = view(A, b_start:b_end, :)
                 τs′ = view(τs, τ_offset:τ_offset+p.w-1)
 
-                @spawn merge_block_qr!(A′, τs′, merged_block_size)
+                #=@spawn=# merge_block_qr!(A′, τs′, merged_block_size)
 
                 τ_offset += p.w
             end
@@ -142,7 +142,7 @@ function apply_tsqr_left!(qr, A, τs, p::Panel)
     τ_offset = 1
 
     # First standard QR on every panel.
-    @sync for b = OneTo(num_panels_vertically)
+    #=@sync=# for b = OneTo(num_panels_vertically)
         b_start = (b - 1) * p.h + 1
         b_end = min(b_start + p.h - 1, m)
         τs′ = view(τs, τ_offset:τ_offset+p.w-1)
@@ -150,7 +150,7 @@ function apply_tsqr_left!(qr, A, τs, p::Panel)
         qr′ = view(qr, b_start:b_end, :)
         A′ = view(A, b_start:b_end, :)
 
-        @spawn apply_tiny_Q_left!(qr′, A′, τs′)
+        #=@spawn=# apply_tiny_Q_left!(qr′, A′, τs′)
 
         τ_offset += p.w
     end
@@ -166,7 +166,7 @@ function apply_tsqr_left!(qr, A, τs, p::Panel)
         let num_panels_vertically = ÷(m, merged_block_size, RoundUp), merged_block_size=merged_block_size
         
             # combine all pairs of panels.
-            @sync for b = OneTo(num_panels_vertically ÷ 2)
+            #=@sync=# for b = OneTo(num_panels_vertically ÷ 2)
                 b_start = (b - 1) * 2merged_block_size + 1
                 b_end = min(b_start + 2merged_block_size - 1, m)
 
@@ -174,7 +174,7 @@ function apply_tsqr_left!(qr, A, τs, p::Panel)
                 A′ = view(A, b_start:b_end, :)
                 τs′ = view(τs, τ_offset:τ_offset+p.w-1)
                 
-                @spawn apply_tiny_Q_with_gap_left!(qr′, A′, τs′, merged_block_size)
+                #=@spawn=# apply_tiny_Q_with_gap_left!(qr′, A′, τs′, merged_block_size)
                 
                 τ_offset += p.w
             end
@@ -196,7 +196,7 @@ function apply_tsqr_right!(qr, A, τs, p::Panel)
     τ_offset = 1
 
     # First standard QR on every panel.
-    @sync for b = OneTo(num_panels_vertically)
+    #=@sync=# for b = OneTo(num_panels_vertically)
         b_start = (b - 1) * p.h + 1
         b_end = min(b_start + p.h - 1, m)
         τs′ = view(τs, τ_offset:τ_offset+p.w-1)
@@ -204,7 +204,7 @@ function apply_tsqr_right!(qr, A, τs, p::Panel)
         qr′ = view(qr, b_start:b_end, :)
         A′ = view(A, :, b_start:b_end)
 
-        @spawn apply_tiny_Q_right!(qr′, A′, τs′)
+        #=@spawn=# apply_tiny_Q_right!(qr′, A′, τs′)
 
         τ_offset += p.w
     end
@@ -220,7 +220,7 @@ function apply_tsqr_right!(qr, A, τs, p::Panel)
         let num_panels_vertically = ÷(m, merged_block_size, RoundUp), merged_block_size=merged_block_size
 
             # combine all pairs of panels.
-            @sync for b = OneTo(num_panels_vertically ÷ 2)
+            #=@sync=# for b = OneTo(num_panels_vertically ÷ 2)
                 b_start = (b - 1) * 2merged_block_size + 1
                 b_end = min(b_start + 2merged_block_size - 1, m)
 
@@ -228,7 +228,7 @@ function apply_tsqr_right!(qr, A, τs, p::Panel)
                 A′ = view(A, :, b_start:b_end)
                 τs′ = view(τs, τ_offset:τ_offset+p.w-1)
                 
-                @spawn apply_tiny_Q_with_gap_right!(qr′, A′, τs′, merged_block_size)
+                #=@spawn=# apply_tiny_Q_with_gap_right!(qr′, A′, τs′, merged_block_size)
                 
                 τ_offset += p.w
             end
