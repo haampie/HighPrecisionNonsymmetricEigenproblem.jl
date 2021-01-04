@@ -35,7 +35,7 @@ end
         $(Expr(:meta, :inline, :propagate_inbounds))
         dist = length(A)
         @nexprs $M j -> A.A[i + (j-1) * dist] = v._limbs[j]
-        return 1
+        return v
     end
 end
 
