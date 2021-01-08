@@ -245,3 +245,178 @@ end
         return +(TupleOfMultiFloat(vec_total)...)
     end
 end
+
+const BUFFER = Vector{UInt8}(undef, 0)
+
+function to_buffer(Q::AbstractMatrix{Float64x4}, τs::AbstractVector{Float64x4}, A::AbstractMatrix{Float64x4})
+    m, n = size(A)
+
+    @assert size(Q, 1) == m == 32
+    @assert size(Q, 2) == length(τs) == 4
+    @assert n % 28 == 0
+
+    A_size = 4 * 32 * n
+    Q_size = 4 * 32 * 4
+    τ_size = 4
+
+    a = max(VectorizationBase.REGISTER_SIZE, VectorizationBase.L₁CACHE.linesize)
+    resize!(BUFFER, (A_size + Q_size + τ_size) * sizeof(Float64) + 3a)
+
+    p = VectorizationBase.align(convert(Ptr{Float64}, pointer(BUFFER)), a)
+    τs′ = unsafe_wrap(Array, p, (4, 4), own=false)
+    p = VectorizationBase.align(p + sizeof(Float64) * length(τs′), a)
+    Q′ = unsafe_wrap(Array, p, 4 * 32 * 4, own=false)
+    p = VectorizationBase.align(p + sizeof(Float64) * length(Q′), a)
+    A′ = unsafe_wrap(Array, p, 4 * 32 * n, own=false)
+
+    # Copy τ, Q and A into the buffers.
+    # not gonna order 
+    copyto!(τs′,  reinterpret(Float64, τs))
+
+    # Q is simply column major.
+    copyto!(Q′, reinterpret(Float64, Q))
+
+    # And for A we access
+    copyto!(A′, permutedims(reshape(permutedims(reshape(reinterpret(Float64, A), 4, 32, n), (1, 3, 2)), 4, 4, n ÷ 4, 32), (2, 1, 4, 3)))
+
+    return Q′, τs′, A′
+end
+
+function unpack!(A::AbstractMatrix{Float64x4}, Abuf::Vector{Float64})
+    m, n = size(A)
+
+    @assert size(A, 1) == 32
+    @assert length(A) == length(Abuf) ÷ 4
+
+    # And for A we acces
+    copyto!(A, reinterpret(Float64x4, reshape(permutedims(reshape(permutedims(reshape(Abuf, 4, 4, 32, n ÷ 4), (2, 1, 4, 3)), 4, n, 32), (1, 3, 2)), 128, n)))
+
+    return A
+end
+
+function do_qr!(packedQ, packedτ, packedA)
+    # minikernel for size.
+    # τ is stored in buffer[1:4] (when interpreted as Float64x4)
+    # Q is stored in buffer[5:end][:, 1:4] (interpreted as Matrix{Float64x4} of size 34xN)
+    # A is stored in buffer[5:end][:, 5:end] (interpreted as Matrix{Float64x4} of size 34xN)
+
+    pA = stridedpointer(packedA)
+    # pQ = stridedpointer(packedQ)
+    # pτ = stridedpointer(packedτ)
+
+    @inbounds for panel = OneTo(length(packedA) ÷ (32 * 28 * 4))
+        τi = 1
+        for q_col = OneTo(4)
+            # broadcast τ's limbs to full-width registers.
+            τ1 = Vec{4}(packedτ[τi+0])
+            τ2 = Vec{4}(packedτ[τi+1])
+            τ3 = Vec{4}(packedτ[τi+2])
+            τ4 = Vec{4}(packedτ[τi+3])
+
+            τ_mf = MultiFloat((τ1, τ2, τ3, τ4))
+            
+            # Reduce columns [col_offset, col_offset+4)
+            aj = 32 * 28 * 4 * (panel - 1) + 16 * (q_col - 1) + 1
+
+            # Loop over the columns in block of size 4.
+            for col_block = OneTo(28 ÷ 4)
+
+                qi = (q_col - 1) * 4 * 32 + 4 * (q_col - 1) + 1
+
+                start_ai = aj
+                start_qi = qi
+
+                # Accumulator. reflector[1] == 1, so no multiplication here.
+                a11 = vload(pA, (MM{4}(aj + 0 ),))
+                a21 = vload(pA, (MM{4}(aj + 4 ),))
+                a31 = vload(pA, (MM{4}(aj + 8 ),))
+                a41 = vload(pA, (MM{4}(aj + 12),))
+
+                accumulator_mf = MultiFloat((a11, a21, a31, a41))
+
+                aj += 16
+                qi += 4
+
+                # dot over the next 31 rows.
+                for row = OneTo(32 - q_col)
+                    # Load the Q-values and broadcast them to a single register
+                    q1 = Vec{4}(packedQ[qi + 0])
+                    q2 = Vec{4}(packedQ[qi + 1])
+                    q3 = Vec{4}(packedQ[qi + 2])
+                    q4 = Vec{4}(packedQ[qi + 3])
+
+                    q_mf = MultiFloat((q1, q2, q3, q4))
+
+                    # Load the values of A of 4 columns
+                    a1 = vload(pA, (MM{4}(aj + 0),))
+                    a2 = vload(pA, (MM{4}(aj + 4),))
+                    a3 = vload(pA, (MM{4}(aj + 8),))
+                    a4 = vload(pA, (MM{4}(aj + 12),))
+
+                    a_mf = MultiFloat((a1, a2, a3, a4))
+                    
+                    accumulator_mf += q_mf * a_mf
+
+                    qi += 4
+                    aj += 16
+                end
+
+                α_mf = τ_mf * accumulator_mf
+
+                # go back to the top.
+                aj = start_ai
+                qi = start_qi
+
+                a1 = vload(pA, (MM{4}(aj + 0),))
+                a2 = vload(pA, (MM{4}(aj + 4),))
+                a3 = vload(pA, (MM{4}(aj + 8),))
+                a4 = vload(pA, (MM{4}(aj + 12),))
+
+                a_mf = MultiFloat((a1, a2, a3, a4))
+
+                a_mf -= α_mf
+
+                vstore!(pA, a_mf._limbs[1], (MM{4}(aj + 0 ),))
+                vstore!(pA, a_mf._limbs[2], (MM{4}(aj + 4 ),))
+                vstore!(pA, a_mf._limbs[3], (MM{4}(aj + 8 ),))
+                vstore!(pA, a_mf._limbs[4], (MM{4}(aj + 12),))
+
+                aj += 16
+                qi += 4
+
+                # Finally we do the axpy a -= α * q
+                for row = OneTo(32 - q_col)
+                    # Load the Q-values and broadcast them to a single register
+                    q1 = Vec{4}(packedQ[qi+0])
+                    q2 = Vec{4}(packedQ[qi+1])
+                    q3 = Vec{4}(packedQ[qi+2])
+                    q4 = Vec{4}(packedQ[qi+3])
+
+                    q_mf = MultiFloat((q1, q2, q3, q4))
+
+                    # Load the values of A of 4 columns
+                    a1 = vload(pA, (MM{4}(aj + 0),))
+                    a2 = vload(pA, (MM{4}(aj + 4),))
+                    a3 = vload(pA, (MM{4}(aj + 8),))
+                    a4 = vload(pA, (MM{4}(aj + 12),))
+
+                    a_mf = MultiFloat((a1, a2, a3, a4))
+
+                    a_mf -= α_mf * q_mf
+
+                    vstore!(pA, a_mf._limbs[1], (MM{4}(aj + 0),))
+                    vstore!(pA, a_mf._limbs[2], (MM{4}(aj + 4),))
+                    vstore!(pA, a_mf._limbs[3], (MM{4}(aj + 8),))
+                    vstore!(pA, a_mf._limbs[4], (MM{4}(aj + 12),))
+
+                    qi += 4
+                    aj += 16
+                end
+
+                aj += 16 * (q_col - 1)
+            end
+
+            τi += 4
+        end
+    end
+end
