@@ -288,7 +288,7 @@ function to_buffer(Q::AbstractMatrix{MultiFloat{Float64,M}}, τs::AbstractVector
     copyto!(Q′, reinterpret(Float64, Q))
 
     # And for A we access
-    copyto!(A′, permutedims(reshape(reinterpret(Float64, A), M, Q_HEIGHT, W, n ÷ W), (3, 1, 2, 4)))
+    copyto!(A′, permutedims(reshape(reinterpret(Float64, A), M * Q_HEIGHT, W, n ÷ W), (2, 1, 3)))
 
     return Q′, τs′, A′
 end
@@ -302,7 +302,7 @@ function unpack!(A::AbstractMatrix{MultiFloat{Float64,M}}, Abuf::Vector{Float64}
     @assert length(A) == length(Abuf) ÷ M
 
     # And for A we acces
-    copyto!(A, reinterpret(MultiFloat{Float64,M}, permutedims(reshape(Abuf, W, M, Q_HEIGHT, n ÷ W), (2, 3, 1, 4))))
+    copyto!(A, reinterpret(MultiFloat{Float64,M}, permutedims(reshape(Abuf, W, M * Q_HEIGHT, n ÷ W), (2, 1, 3))))
 
     return A
 end
