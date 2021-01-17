@@ -256,7 +256,7 @@ function A_panel_width(::Type{MultiFloat{T, M}}) where {T, M}
     return W * (((VectorizationBase.L₁CACHE.size ÷ sizeof(T) ÷ M - Q_WIDTH) ÷ Q_HEIGHT - Q_WIDTH) ÷ W)
 end
 
-function to_buffer(Q::AbstractMatrix{MultiFloat{Float64,M}}, τs::AbstractVector{MultiFloat{Float64,M}}, A::AbstractMatrix{MultiFloat{Float64,M}}) where {M}
+function pack!(Q::AbstractMatrix{MultiFloat{Float64,M}}, τs::AbstractVector{MultiFloat{Float64,M}}, A::AbstractMatrix{MultiFloat{Float64,M}}) where {M}
     m, n = size(A)
 
     MF_T = MultiFloat{Float64, M}
@@ -288,7 +288,12 @@ function to_buffer(Q::AbstractMatrix{MultiFloat{Float64,M}}, τs::AbstractVector
     copyto!(Q′, reinterpret(Float64, Q))
 
     # And for A we access
-    copyto!(A′, permutedims(reshape(reinterpret(Float64, A), M * Q_HEIGHT, W, n ÷ W), (2, 1, 3)))
+    fast_pack!(
+        reshape(A′, W, M * Q_HEIGHT, n ÷ W),
+        reshape(reinterpret(Float64, A), M * Q_HEIGHT, W, n ÷ W),
+        Val{W}(),
+        Val{M * Q_HEIGHT}()
+    )
 
     return Q′, τs′, A′
 end
@@ -302,9 +307,48 @@ function unpack!(A::AbstractMatrix{MultiFloat{Float64,M}}, Abuf::Vector{Float64}
     @assert length(A) == length(Abuf) ÷ M
 
     # And for A we acces
-    copyto!(A, reinterpret(MultiFloat{Float64,M}, permutedims(reshape(Abuf, W, M * Q_HEIGHT, n ÷ W), (2, 1, 3))))
+    fast_unpack!(
+        reshape(reinterpret(Float64, A), M * Q_HEIGHT, W, n ÷ W),
+        reshape(Abuf, W, M * Q_HEIGHT, n ÷ W),
+        Val{W}(),
+        Val{M * Q_HEIGHT}()
+    )
 
     return A
+end
+
+function fast_pack!(B::AbstractArray{Float64, 3}, A::AbstractArray{Float64, 3}, ::Val{W}, ::Val{M}) where {W, M}
+    pA = stridedpointer(A)
+    pB = stridedpointer(B)
+
+    for k = axes(A, 3)
+        i = 1
+        while i < M
+            v = vload(pA, Unroll{2,1,W,1,W,typemax(UInt)}((i, 1, k)))
+            vt = VectorizationBase.vtranspose(v, Val{W}())
+            vstore!(pB, vt, Unroll{2,1,W,1,W,typemax(UInt)}((1, i, k)))
+            i += W
+        end
+    end
+
+    return nothing
+end
+
+function fast_unpack!(B::AbstractArray{Float64, 3}, A::AbstractArray{Float64, 3}, ::Val{W}, ::Val{M}) where {W, M}
+    pA = stridedpointer(A)
+    pB = stridedpointer(B)
+
+    for k = axes(A, 3)
+        i = 1
+        while i < M
+            v = vload(pA, Unroll{2,1,W,1,W,typemax(UInt)}((1, i, k)))
+            vt = VectorizationBase.vtranspose(v, Val{W}())
+            vstore!(pB, vt, Unroll{2,1,W,1,W,typemax(UInt)}((i, 1, k)))
+            i += W
+        end
+    end
+
+    return nothing
 end
 
 using Base.Cartesian: @nexprs, @ntuple
